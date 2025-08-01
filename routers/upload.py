@@ -1,7 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+import base64
+from fastapi import APIRouter, Form, UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from database.connection import SessionDep
+from services.email_service import send_email_with_attachment
 from services.invoice_processor import (
     process_multialarm,
     process_vodafone,
@@ -152,6 +154,96 @@ async def upload_vodafone(session: SessionDep, file: UploadFile = File(...)):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Váratlan hiba történt: {e}",
+        )
+
+
+@router.post("/send/vodafone")
+async def upload_vodafone(
+    session: SessionDep,
+    recipient: str = Form(...),
+    subject: str = Form(...),
+    message: str = Form(...),
+    attachment: UploadFile = File(...),
+):
+
+    print(message)
+
+    lines = message.replace("\r\n", "\n").split("\n")
+    html = "".join(f"<p>{line.strip()}</p>" for line in lines)
+
+    if attachment.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Csak PDF fájl feltöltése engedélyezett.",
+        )
+
+    pdf_bytes = await attachment.read()
+    result = process_vodafone(pdf_bytes)
+
+    if not result["invoice_summary"] and not result["service_charges"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Csak olyan PDF fájl tölthető fel, amely releváns számlaadatokat tartalmaz.",
+        )
+
+    try:
+        phone_user_map = get_phone_user_map(session)
+        teszor_category_map, mapping_lookup = get_teszor_mapping_lookup(session)
+        excel_buffer = export_vodafone_to_excel_bytes(
+            result, phone_user_map, teszor_category_map, mapping_lookup
+        )
+
+        filename = (
+            f"vodafone_{result["invoice_number"]}.xlsx"
+            if result["invoice_number"]
+            else "vodafone_invoice_data.xlsx"
+        )
+        attachments = [
+            {
+                "name": attachment.filename,
+                "contentType": "application/pdf",
+                "contentInBase64": base64.b64encode(pdf_bytes).decode(),
+            },
+            {
+                "name": filename,
+                "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "contentInBase64": base64.b64encode(excel_buffer.getvalue()).decode(),
+            },
+        ]
+        result = send_email_with_attachment(
+            to_emails=recipient,
+            cc_emails="kraaliknorbert@gmail.com",
+            subject=subject,
+            html=html,
+            plainText=message,
+            attachments=attachments,
+        )
+
+        return result
+
+        # message = {
+        #     "senderAddress": "DoNotReply@playground.kraliknorbert.com",
+        #     "recipients": {
+        #         "to": [{"address": recipient}],
+        #         "cc": [{"address": "kraaliknorbert@gmail.com"}],
+        #     },
+        #     "content": {
+        #         "subject": subject,
+        #         "plainText": message,
+        #         "html": html,
+        #     },
+        #     "attachments": attachments,
+        # }
+        # return StreamingResponse(
+        #     excel_buffer,
+        #     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        #     headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        # )
 
     except Exception as e:
         raise HTTPException(

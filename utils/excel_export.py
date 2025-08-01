@@ -128,9 +128,6 @@ def export_vodafone_to_excel_bytes(
                     "NetAmount",
                 ],
             )
-            # df_charges["Employee"] = (
-            #     df_charges["PhoneNumber"].map(phone_user_map).fillna("N/A")
-            # )
             df_charges["Employee"] = df_charges["PhoneNumber"].map(
                 lambda pn: phone_user_map.get(pn, {}).get("name", "N/A")
             )
@@ -155,6 +152,15 @@ def export_vodafone_to_excel_bytes(
                 df[col] = df_charges[col].apply(_clean_float)
 
             df.to_excel(writer, sheet_name="ServiceCharges", index=False)
+
+            # df.loc[df["Employee"] == "Központi", "PhoneNumber"] = "N/A"
+            mask = (df["Employee"] == "Központi") & (
+                df["PhoneNumber"].isna()
+                | (df["PhoneNumber"] == "")
+                | (df["PhoneNumber"] == "N/A")
+            )
+            df.loc[mask, "PhoneNumber"] = "Központi"
+            df.loc[df["Employee"] == "Központi", "Axapta Name"] = "N/A"
 
             if not df.empty:
                 pivot_df = pd.pivot_table(
