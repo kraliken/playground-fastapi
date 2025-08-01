@@ -171,10 +171,7 @@ async def upload_vodafone(
     attachment: UploadFile = File(...),
 ):
 
-    print(message)
-
-    lines = message.replace("\r\n", "\n").split("\n")
-    html = "".join(f"<p>{line.strip()}</p>" for line in lines)
+    html = f"<p>{message.replace('\r\n', '<br>').replace('\n', '<br>').replace('\r', '<br>')}</p>"
 
     if attachment.content_type != "application/pdf":
         raise HTTPException(
