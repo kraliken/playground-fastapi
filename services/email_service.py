@@ -10,11 +10,15 @@ email_client = EmailClient.from_connection_string(connection_string)
 def send_email_with_attachment(
     to_emails, cc_emails, subject, html, plainText, attachments
 ):
+
+    to_list = [{"address": email} for email in to_emails] if to_emails else []
+    cc_list = [{"address": email} for email in cc_emails] if cc_emails else []
+
     message = {
         "senderAddress": "DoNotReply@playground.kraliknorbert.com",
         "recipients": {
-            "to": [{"address": to_emails}],
-            "cc": [{"address": cc_emails}],
+            "to": to_list,
+            "cc": cc_list,
         },
         "content": {
             "subject": subject,
