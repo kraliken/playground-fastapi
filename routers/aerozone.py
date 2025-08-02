@@ -1,6 +1,6 @@
 import base64
 from typing import List
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, status, Form
 from sqlmodel import select, case
 from sqlalchemy.orm import joinedload
 from collections import defaultdict
@@ -173,11 +173,12 @@ async def upload_invoice(
         return {"success": True, "message": "Az összes számla sikeresen elmentve."}
 
 
-@router.get("/invoices/send")
+@router.post("/invoices/send")
 def send_complete_invoices(
     session: SessionDep,
+    subject: str = Form(...),
+    message: str = Form(...),
 ):
-    print("SZÁMLÁK LEKÉRDEZÉSE START")
     statement = select(UploadedInvoice).options(
         joinedload(UploadedInvoice.partner).joinedload(Partner.emails)
     )
@@ -190,7 +191,7 @@ def send_complete_invoices(
         partner = invoice.partner
         if not partner:
             continue
-        # csak akkor, ha van "to" típusú email
+
         to_emails = [e for e in partner.emails if e.type == "to"]
         cc_emails = [e for e in partner.emails if e.type == "cc"]
         if not to_emails:
@@ -240,26 +241,14 @@ def send_complete_invoices(
 
         try:
 
-            html = f"""
-                    <p>Kedves Partnerünk,</p><br><br>
-                    <p>csatolva küldjük az Önök részére kiállított <strong>{len(attachments)} db számlát</strong>.</p>
-                    <br><br>
-                    <p>Üdvözlettel,</p>
-                    <p>X.Y. Kft.,</p>
-                """
+            html = f"<p>{message.replace('\r\n', '<br>').replace('\n', '<br>').replace('\r', '<br>')}</p>"
 
-            plainText = (
-                f"Kedves Partnerünk,\n\n"
-                f"Csatolva küldjük az Önök részére kiállított {len(attachments)} db számlát.\n\n"
-                "Üdvözlettel,\n"
-                "X.Y. Kft."
-            )
             send_email_with_attachment(
                 to_emails=to_email_addresses,
                 cc_emails=cc_email_addresses,
-                subject=f"Beérkezett számlák – {partner_name}",
+                subject=subject,
                 html=html,
-                plainText=plainText,
+                plainText=message,
                 attachments=attachments,
             )
 
@@ -363,6 +352,17 @@ def update_partner(partner_id: int, partner_update: PartnerUpdate, session: Sess
     session.add(partner)
     session.commit()
     session.refresh(partner)
+
+    statement = select(UploadedInvoice).where(
+        UploadedInvoice.partner_id == None,
+        UploadedInvoice.partner_tax_id == partner.tax_number,
+    )
+    invoices_to_update = session.exec(statement).all()
+
+    for inv in invoices_to_update:
+        inv.partner_id = partner.id
+    if invoices_to_update:
+        session.commit()
 
     return partner
 
