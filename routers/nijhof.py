@@ -1,7 +1,9 @@
 import base64
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
 
+from database.models import PlayerRead
+from routers.auth.oauth2 import get_current_user
 from services.invoice_processor import (
     process_multialarm,
     process_volvo,
@@ -18,7 +20,9 @@ OWN_TAX_ID = "25892941-2-41"
 
 
 @router.post("/upload/invoice/volvo")
-async def upload_volvo(file: UploadFile = File(...)):
+async def upload_volvo(
+    file: UploadFile = File(...), current_user: PlayerRead = Depends(get_current_user)
+):
 
     if file.content_type != "application/pdf":
         raise HTTPException(

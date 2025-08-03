@@ -1,7 +1,8 @@
+from pydantic import EmailStr, constr
 from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 from typing import List, Optional
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class EmailType(str, Enum):
@@ -13,6 +14,51 @@ class EmailType(str, Enum):
 class Status(str, Enum):
     pending = "pending"
     ready = "ready"
+
+
+class Role(str, Enum):
+    admin = "admin"
+    member = "member"
+
+
+class Player(SQLModel, table=True):
+    __tablename__ = "players"
+
+    id: int = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, min_length=6, max_length=25)
+    email: EmailStr = Field(default=None, max_length=100, nullable=True)
+    role: Role = Field(default=Role.member)
+    hashed_password: str = Field(max_length=255)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PlayerCreate(SQLModel):
+    username: str
+    password: str
+
+
+class PlayerRead(SQLModel):
+    id: int
+    username: str
+    email: Optional[EmailStr] = None
+    role: Role
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(SQLModel):
+    username: str | None = None
+
+
+class TokenWithUser(Token):
+    user: PlayerRead
 
 
 class PartnerEmailLink(SQLModel, table=True):

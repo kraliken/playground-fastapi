@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 
+
 load_dotenv(override=True)
 
 from contextlib import asynccontextmanager
@@ -8,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database.connection import create_db_and_tables
+from routers.auth import authentication
 from routers import nijhof
 from routers import esselte
 from routers import aerozone
@@ -38,6 +40,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
+app.include_router(authentication.router, prefix="/api/v1")
 app.include_router(nijhof.router, prefix="/api/v1")
 app.include_router(esselte.router, prefix="/api/v1")
 app.include_router(aerozone.router, prefix="/api/v1")
