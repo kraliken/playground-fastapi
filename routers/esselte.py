@@ -1,6 +1,6 @@
 from typing import List
 import base64
-from fastapi import APIRouter, Form, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlmodel import select
 from sqlalchemy.orm import joinedload
@@ -9,9 +9,11 @@ from database.connection import SessionDep
 from database.models import (
     PhoneBook,
     PhoneBookRead,
+    PlayerRead,
     TeszorVatExpenseMap,
     TeszorVatLedgerMapRead,
 )
+from routers.auth.oauth2 import get_current_user
 from services.email_service import send_email_with_attachment
 from services.invoice_processor import process_vodafone
 from utils.excel_export import export_vodafone_to_excel_bytes
@@ -21,7 +23,9 @@ router = APIRouter(prefix="/esselte", tags=["esselte"])
 
 
 @router.get("/phonebook", response_model=List[PhoneBookRead])
-def get_phonebook(session: SessionDep):
+def get_phonebook(
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
+):
 
     statement = select(PhoneBook).options(joinedload(PhoneBook.employee))
     phonebooks = session.exec(statement).all()
@@ -29,7 +33,9 @@ def get_phonebook(session: SessionDep):
 
 
 @router.get("/teszor-mapping", response_model=List[TeszorVatLedgerMapRead])
-def get_teszor_mappings(session: SessionDep):
+def get_teszor_mappings(
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
+):
 
     statement = (
         select(TeszorVatExpenseMap)
@@ -55,7 +61,11 @@ def get_teszor_mappings(session: SessionDep):
 
 
 @router.post("/upload/invoice/vodafone")
-async def upload_vodafone(session: SessionDep, file: UploadFile = File(...)):
+async def upload_vodafone(
+    session: SessionDep,
+    file: UploadFile = File(...),
+    current_user: PlayerRead = Depends(get_current_user),
+):
 
     if file.content_type != "application/pdf":
         raise HTTPException(
@@ -104,6 +114,7 @@ async def upload_vodafone(
     subject: str = Form(...),
     message: str = Form(...),
     attachment: UploadFile = File(...),
+    current_user: PlayerRead = Depends(get_current_user),
 ):
 
     html = f"<p>{message.replace('\r\n', '<br>').replace('\n', '<br>').replace('\r', '<br>')}</p>"
@@ -147,9 +158,10 @@ async def upload_vodafone(
                 "contentInBase64": base64.b64encode(excel_buffer.getvalue()).decode(),
             },
         ]
+        to_list = [recipient]
         result = send_email_with_attachment(
-            to_emails=recipient,
-            cc_emails="kraaliknorbert@gmail.com",
+            to_emails=to_list,
+            cc_emails=["kraaliknorbert@gmail.com"],
             subject=subject,
             html=html,
             plainText=message,
@@ -158,26 +170,8 @@ async def upload_vodafone(
 
         return result
 
-        # message = {
-        #     "senderAddress": "DoNotReply@playground.kraliknorbert.com",
-        #     "recipients": {
-        #         "to": [{"address": recipient}],
-        #         "cc": [{"address": "kraaliknorbert@gmail.com"}],
-        #     },
-        #     "content": {
-        #         "subject": subject,
-        #         "plainText": message,
-        #         "html": html,
-        #     },
-        #     "attachments": attachments,
-        # }
-        # return StreamingResponse(
-        #     excel_buffer,
-        #     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        #     headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        # )
-
     except Exception as e:
+        print("ez küldöm vissza")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Váratlan hiba történt: {e}",

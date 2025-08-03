@@ -38,13 +38,13 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    token_from_cookie = request.cookies.get("access_token")
+    token_to_check = request.cookies.get("access_token") or token
 
-    if not token_from_cookie:
+    if not token_to_check:
         raise credentials_exception
 
     try:
-        payload = jwt.decode(token_from_cookie, secret_key, algorithms=[algorithm])
+        payload = jwt.decode(token_to_check, secret_key, algorithms=[algorithm])
         username = payload.get("sub")
 
         if username is None:

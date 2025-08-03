@@ -1,6 +1,6 @@
 import base64
 from typing import List
-from fastapi import APIRouter, HTTPException, UploadFile, File, status, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form
 from sqlmodel import select, case
 from sqlalchemy.orm import joinedload
 from collections import defaultdict
@@ -17,9 +17,11 @@ from database.models import (
     PartnerEmailUpdate,
     PartnerRead,
     PartnerUpdate,
+    PlayerRead,
     Status,
     UploadedInvoice,
 )
+from routers.auth.oauth2 import get_current_user
 from services.blob_service import (
     delete_blob_from_url,
     download_pdf_from_blob,
@@ -36,7 +38,7 @@ OWN_TAX_ID = "25892941-2-41"
 
 @router.get("/invoices/all")
 def get_uploaded_invoices(
-    session: SessionDep,
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
 ):
     statement = select(UploadedInvoice).options(
         joinedload(UploadedInvoice.partner).joinedload(Partner.emails)
@@ -111,6 +113,7 @@ def get_uploaded_invoices(
 async def upload_invoice(
     session: SessionDep,
     invoices: List[UploadFile] = File(...),
+    current_user: PlayerRead = Depends(get_current_user),
 ):
     errors = []
 
@@ -178,6 +181,7 @@ def send_complete_invoices(
     session: SessionDep,
     subject: str = Form(...),
     message: str = Form(...),
+    current_user: PlayerRead = Depends(get_current_user),
 ):
     statement = select(UploadedInvoice).options(
         joinedload(UploadedInvoice.partner).joinedload(Partner.emails)
@@ -284,7 +288,7 @@ def send_complete_invoices(
 
 @router.delete("/invoices/delete")
 def delete_invoices(
-    session: SessionDep,
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
 ):
     invoices = session.exec(select(UploadedInvoice)).all()
     errors = []
@@ -316,7 +320,11 @@ def delete_invoices(
 @router.post(
     "/partner/create", status_code=status.HTTP_201_CREATED, response_model=PartnerRead
 )
-def create_partner(partner: PartnerCreate, session: SessionDep):
+def create_partner(
+    partner: PartnerCreate,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
 
     db_partner = Partner(
         name=partner.name, tax_number=partner.tax_number, contact=partner.contact
@@ -341,7 +349,12 @@ def create_partner(partner: PartnerCreate, session: SessionDep):
 
 
 @router.patch("/partner/{partner_id}", response_model=PartnerUpdate)
-def update_partner(partner_id: int, partner_update: PartnerUpdate, session: SessionDep):
+def update_partner(
+    partner_id: int,
+    partner_update: PartnerUpdate,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
     partner = session.get(Partner, partner_id)
     if not partner:
         raise HTTPException(status_code=404, detail="Partner not found")
@@ -368,7 +381,11 @@ def update_partner(partner_id: int, partner_update: PartnerUpdate, session: Sess
 
 
 @router.delete("/partner/{partner_id}")
-def delete_partner(partner_id: int, session: SessionDep):
+def delete_partner(
+    partner_id: int,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
 
     statement = select(PartnerEmailLink).where(
         PartnerEmailLink.partner_id == partner_id
@@ -387,7 +404,9 @@ def delete_partner(partner_id: int, session: SessionDep):
 
 
 @router.get("/partners/all", response_model=List[PartnerRead])
-def get_partners(session: SessionDep):
+def get_partners(
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
+):
     partners = session.exec(select(Partner)).all()
 
     return partners
@@ -398,7 +417,11 @@ def get_partners(session: SessionDep):
     status_code=status.HTTP_201_CREATED,
     response_model=PartnerEmailResponse,
 )
-def create_partner_email(email_in: PartnerEmailCreate, session: SessionDep):
+def create_partner_email(
+    email_in: PartnerEmailCreate,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
 
     db_email = PartnerEmail(email=email_in.email, type=email_in.type)
     session.add(db_email)
@@ -409,7 +432,12 @@ def create_partner_email(email_in: PartnerEmailCreate, session: SessionDep):
 
 
 @router.patch("/email/{email_id}", response_model=PartnerEmailUpdate)
-def update_email(email_id: int, email_update: PartnerEmailUpdate, session: SessionDep):
+def update_email(
+    email_id: int,
+    email_update: PartnerEmailUpdate,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
     email = session.get(PartnerEmail, email_id)
     if not email:
         raise HTTPException(status_code=404, detail="Email not found")
@@ -425,7 +453,11 @@ def update_email(email_id: int, email_update: PartnerEmailUpdate, session: Sessi
 
 
 @router.delete("/email/{email_id}")
-def delete_partner(email_id: int, session: SessionDep):
+def delete_partner(
+    email_id: int,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
 
     statement = select(PartnerEmailLink).where(PartnerEmailLink.email_id == email_id)
     links = session.exec(statement).all()
@@ -442,7 +474,9 @@ def delete_partner(email_id: int, session: SessionDep):
 
 
 @router.get("/emails/all", response_model=List[PartnerEmailResponse])
-def get_emails(session: SessionDep):
+def get_emails(
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
+):
 
     emails = session.exec(select(PartnerEmail)).all()
 
@@ -450,7 +484,12 @@ def get_emails(session: SessionDep):
 
 
 @router.get("/emails/available/{partner_id}", response_model=List[PartnerEmailResponse])
-def get_available_to_emails(partner_id: int, type: str, session: SessionDep):
+def get_available_to_emails(
+    partner_id: int,
+    type: str,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
     linked_email_ids = session.exec(
         select(PartnerEmailLink.email_id).where(
             PartnerEmailLink.partner_id == partner_id
@@ -468,7 +507,9 @@ def get_available_to_emails(partner_id: int, type: str, session: SessionDep):
 
 
 @router.get("/connection/all")
-def get_connections(session: SessionDep):
+def get_connections(
+    session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
+):
 
     type_order = case((PartnerEmail.type == "to", 0), else_=1)
 
@@ -500,7 +541,13 @@ def get_connections(session: SessionDep):
 
 
 @router.post("/connection/create")
-def link_email_to_partner(email_id: int, partner_id: int, session: SessionDep):
+def link_email_to_partner(
+    email_id: int,
+    partner_id: int,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
+
     link = PartnerEmailLink(partner_id=partner_id, email_id=email_id)
     session.add(link)
     session.commit()
@@ -509,7 +556,12 @@ def link_email_to_partner(email_id: int, partner_id: int, session: SessionDep):
 
 
 @router.delete("/connection/delete")
-def delete_connection(email_id: int, partner_id: int, session: SessionDep):
+def delete_connection(
+    email_id: int,
+    partner_id: int,
+    session: SessionDep,
+    current_user: PlayerRead = Depends(get_current_user),
+):
     statement = select(PartnerEmailLink).where(
         PartnerEmailLink.partner_id == partner_id,
         PartnerEmailLink.email_id == email_id,

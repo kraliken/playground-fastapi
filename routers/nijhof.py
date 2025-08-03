@@ -64,7 +64,9 @@ async def upload_volvo(
 
 
 @router.post("/upload/invoice/multialarm")
-async def upload_multialarm(file: UploadFile = File(...)):
+async def upload_multialarm(
+    file: UploadFile = File(...), current_user: PlayerRead = Depends(get_current_user)
+):
 
     if file.content_type != "application/pdf":
         raise HTTPException(
