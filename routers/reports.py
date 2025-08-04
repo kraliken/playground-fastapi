@@ -44,8 +44,6 @@ def get_invoice_status_summary(
     query = query.group_by(InvoiceStatusSummary.status)
 
     results = session.exec(query).all()
-    # Eredmény: [(status, total_amount), ...]
-    # Átalakítjuk dict listává:
     return [{"status": row[0], "total_amount": row[1]} for row in results]
 
 
@@ -53,11 +51,11 @@ def get_invoice_status_summary(
 def get_partners(
     session: SessionDep, current_user: PlayerRead = Depends(get_current_user)
 ):
-    # Egyedi partner nevek lekérése, ABC sorrendben
+
     partners = session.exec(
         select(InvoiceStatusSummary.partner_name)
         .distinct()
         .order_by(InvoiceStatusSummary.partner_name)
     ).all()
-    # Visszaadjuk sima string listaként
+
     return partners
