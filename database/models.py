@@ -238,3 +238,45 @@ class TeszorVatLedgerMapRead(SQLModel):
     vat_rate: Optional[str]
     expense_title: Optional[str]
     expense_account_number: Optional[str]
+
+
+class MonthlySummary(SQLModel, table=True):
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int
+    month: int
+    income: int
+    expense: int
+    income_invoice_count: Optional[int] = 0
+    expense_invoice_count: Optional[int] = 0
+    max_income_invoice: Optional[int] = 0
+    max_expense_invoice: Optional[int] = 0
+    income_vat_total: Optional[int] = 0
+    expense_vat_total: Optional[int] = 0
+    notes: Optional[str] = None
+
+
+class InvoiceStatusEnum(str, Enum):
+    paid = "paid"
+    overdue = "overdue"
+    in_progress = "in_progress"
+
+
+class CurrencyEnum(str, Enum):
+    HUF = "HUF"
+    EUR = "EUR"
+
+
+class InvoiceStatusSummary(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    partner_name: str
+    status: InvoiceStatusEnum = Field(index=True)
+    total_amount: int
+    period_year: int
+    period_month: Optional[int] = None
+    currency: CurrencyEnum = Field(default=CurrencyEnum.HUF, index=True)
+
+
+class StatusPieChartRow(SQLModel):
+    status: InvoiceStatusEnum
+    total_amount: int

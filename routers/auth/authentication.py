@@ -81,6 +81,12 @@ def sign_in(
         }
     )
 
+    return TokenWithUser(
+        access_token=access_token,
+        token_type="bearer",
+        user=PlayerRead.model_validate(user),
+    )
+
     # response.set_cookie(
     #     key="access_token",
     #     value=access_token,
@@ -90,12 +96,6 @@ def sign_in(
     #     max_age=60 * 60,
     #     # path="/",
     # )
-
-    return TokenWithUser(
-        access_token=access_token,
-        token_type="bearer",
-        user=PlayerRead.model_validate(user),
-    )
 
 
 @router.get("/me")

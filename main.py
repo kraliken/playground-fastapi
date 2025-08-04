@@ -13,6 +13,7 @@ from routers.auth import authentication
 from routers import nijhof
 from routers import esselte
 from routers import aerozone
+from routers import reports
 
 
 @asynccontextmanager
@@ -44,3 +45,4 @@ app.include_router(authentication.router, prefix="/api/v1")
 app.include_router(nijhof.router, prefix="/api/v1")
 app.include_router(esselte.router, prefix="/api/v1")
 app.include_router(aerozone.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")
