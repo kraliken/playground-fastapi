@@ -1,5 +1,6 @@
 import base64
 from typing import List
+from urllib.parse import unquote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form
 from sqlmodel import select, case
 from sqlalchemy.orm import joinedload
@@ -229,7 +230,7 @@ def send_complete_invoices(
                     }
                 )
                 continue
-
+            print("VAN CSATOLMÁNY")
             attachments.append(
                 {
                     "name": invoice.filename,
@@ -258,7 +259,9 @@ def send_complete_invoices(
 
             print("EMAIL KÜLDÉS HÍVÁS end")
             for invoice in p["invoices"]:
-                delete_blob_from_url(invoice.blob_url)
+                print("ITT LESZ MÉG HIBA: ", invoice.blob_url)
+                print("Blob törlés START")
+                delete_blob_from_url(unquote(invoice.blob_url))
                 print("Blob törlés sikeres")
 
             for invoice in p["invoices"]:

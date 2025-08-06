@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,9 +30,12 @@ def upload_pdf_to_blob(file_bytes: bytes, filename: str):
 
 
 def download_pdf_from_blob(blob_url):
-    blob_name = blob_url.split("/")[-1]
+    blob_name = unquote(blob_url.split("/")[-1])
+    print("THE BLOB NAME IN THE download_pdf_from_blob:", blob_name)
     blob_client = container_client.get_blob_client(blob_name)
+    print("before stream")
     stream = blob_client.download_blob()
+    print("after stream")
     return stream.readall()
 
 
