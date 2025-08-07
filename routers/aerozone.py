@@ -299,7 +299,7 @@ def delete_invoices(
     for invoice in invoices:
         try:
             if invoice.blob_url:
-                delete_blob_from_url(invoice.blob_url)
+                delete_blob_from_url(unquote(invoice.blob_url))
         except Exception as e:
             errors.append({"filename": invoice.filename, "error": str(e)})
 
