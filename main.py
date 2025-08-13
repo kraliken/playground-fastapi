@@ -3,27 +3,30 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-# from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# from database.connection import create_db_and_tables
-from routers.auth import authentication
+from database.connection import create_db_and_tables
+
+# from routers.auth import authentication
 from routers import nijhof
-from routers import esselte
-from routers import aerozone
-from routers import reports
+from routers import employees
+
+# from routers import esselte
+# from routers import aerozone
+# from routers import reports
 
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     create_db_and_tables()
-#     yield
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
 
 
-# app = FastAPI(lifespan=lifespan)
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+# app = FastAPI()
 
 origins = [
     "http://localhost",
@@ -44,6 +47,7 @@ app.add_middleware(
 
 # app.include_router(authentication.router, prefix="/api/v1")
 app.include_router(nijhof.router, prefix="/api/v1")
+app.include_router(employees.router, prefix="/api/v1")
 # app.include_router(esselte.router, prefix="/api/v1")
 # app.include_router(aerozone.router, prefix="/api/v1")
 # app.include_router(reports.router, prefix="/api/v1")

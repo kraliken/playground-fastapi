@@ -2,8 +2,8 @@ import base64
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from database.models import PlayerRead
-from routers.auth.oauth2 import get_current_user
+# from database.models import PlayerRead
+# from routers.auth.oauth2 import get_current_user
 from services.invoice_processor import (
     process_multialarm,
     process_volvo,

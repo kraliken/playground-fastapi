@@ -3,280 +3,306 @@ from sqlmodel import SQLModel, Field, Relationship, Column, ForeignKey
 from typing import List, Optional
 from enum import Enum
 from datetime import datetime, timezone
+import sqlalchemy as sa
 
 
-class EmailType(str, Enum):
-    to = "to"
-    cc = "cc"
-    bcc = "bcc"
+class EmployeeStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"
 
 
-class Status(str, Enum):
-    pending = "pending"
-    ready = "ready"
-
-
-class Role(str, Enum):
+class EmployeeRole(str, Enum):
+    hr_admin = "hr_admin"
+    employee = "employee"
     admin = "admin"
-    member = "member"
-
-
-class Player(SQLModel, table=True):
-    __tablename__ = "players"
-
-    id: int = Field(default=None, primary_key=True)
-    username: str = Field(unique=True, min_length=6, max_length=25)
-    email: EmailStr = Field(default=None, max_length=100, nullable=True)
-    role: Role = Field(default=Role.member)
-    hashed_password: str = Field(max_length=255)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class PlayerCreate(SQLModel):
-    username: str
-    password: str
-
-
-class PlayerRead(SQLModel):
-    id: int
-    username: str
-    email: Optional[EmailStr] = None
-    role: Role
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class Token(SQLModel):
-    access_token: str
-    token_type: str
-
-
-class TokenData(SQLModel):
-    username: str | None = None
-
-
-class TokenWithUser(Token):
-    user: PlayerRead
-
-
-class PartnerEmailLink(SQLModel, table=True):
-    __tablename__ = "partner_email_link"
-
-    partner_id: Optional[int] = Field(
-        default=None, foreign_key="partners.id", primary_key=True
-    )
-    email_id: Optional[int] = Field(
-        default=None, foreign_key="partner_emails.id", primary_key=True
-    )
-
-    partner: Optional["Partner"] = Relationship(back_populates="partner_links")
-    email: Optional["PartnerEmail"] = Relationship(back_populates="email_links")
-
-
-class Partner(SQLModel, table=True):
-    __tablename__ = "partners"
-
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(max_length=255, nullable=False)
-    tax_number: str = Field(max_length=32, nullable=False)
-    contact: Optional[str] = Field(default=None, max_length=255, nullable=True)
-
-    emails: List["PartnerEmail"] = Relationship(
-        back_populates="partners", link_model=PartnerEmailLink
-    )
-    partner_links: List["PartnerEmailLink"] = Relationship(back_populates="partner")
-    invoices: List["UploadedInvoice"] = Relationship(back_populates="partner")
-
-
-class PartnerCreate(SQLModel):
-    name: str
-    tax_number: str
-    contact: Optional[str] = None
-
-
-class PartnerEmail(SQLModel, table=True):
-    __tablename__ = "partner_emails"
-
-    id: int | None = Field(default=None, primary_key=True)
-    email: str = Field(max_length=255, nullable=False)
-    type: EmailType = Field(nullable=False)
-
-    partners: List[Partner] = Relationship(
-        back_populates="emails", link_model=PartnerEmailLink
-    )
-    email_links: List["PartnerEmailLink"] = Relationship(back_populates="email")
-
-
-class UploadedInvoice(SQLModel, table=True):
-    __tablename__ = "uploaded_invoices"
-
-    id: int | None = Field(default=None, primary_key=True)
-    filename: str = Field(nullable=False)
-    own_tax_id: str | None = Field(default=None)
-    partner_tax_id: str | None = Field(default=None)
-    partner_id: int | None = Field(default=None, foreign_key="partners.id")
-    blob_url: str | None = Field(default=None)
-    status: Status = Field(default=Status.pending, nullable=False)
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-
-    partner: Optional["Partner"] = Relationship(back_populates="invoices")
-
-
-class PartnerEmailResponse(SQLModel):
-    id: int
-    email: str
-    type: EmailType
-
-
-class PartnerEmailCreate(SQLModel):
-    email: str
-    type: EmailType
-    # partner_ids: Optional[List[int]] = None
-
-
-class PartnerEmailUpdate(SQLModel):
-    email: Optional[str] = None
-    type: Optional[EmailType] = None
-
-
-class PartnerRead(SQLModel):
-    id: int
-    name: str
-    tax_number: str
-    contact: Optional[str] = None
-    emails: List[PartnerEmailResponse] = []
-
-
-class PartnerUpdate(SQLModel):
-    name: Optional[str] = None
-    tax_number: Optional[str] = None
-    contact: Optional[str] = None
 
 
 class Employee(SQLModel, table=True):
-
-    id: int = Field(default=None, primary_key=True)
-    name: str = Field(unique=True, max_length=50)
-    axapta_name: Optional[str] = Field(default=None)
-    monogram: str = Field(default=None)
-    cost_center: str = Field(default=None)
-
-    phone_numbers: List["PhoneBook"] = Relationship(back_populates="employee")
-
-
-class PhoneBook(SQLModel, table=True):
-
-    id: int = Field(default=None, primary_key=True)
-    phone_number: str = Field(unique=True, max_length=12)
-
-    employee_id: int = Field(foreign_key="employee.id")
-    employee: Optional[Employee] = Relationship(back_populates="phone_numbers")
-
-
-class VatCode(SQLModel, table=True):
-
-    id: int = Field(default=None, primary_key=True)
-    code: str = Field(unique=True, max_length=12)
-    rate: Optional[str] = Field(default=None, max_length=4)
-
-    mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="vat_code")
-
-
-class TeszorCode(SQLModel, table=True):
+    __tablename__ = "employees"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    teszor_code: str = Field(unique=True, max_length=20)
-
-    mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="teszor_code")
-
-
-class ExpenseType(SQLModel, table=True):
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(unique=True, max_length=25)
-    account_number: str = Field(max_length=10)
-
-    mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="expense_type")
+    email: EmailStr = Field(index=True, max_length=100, nullable=False, unique=True)
+    residence: Optional[str] = None
+    current_location: Optional[str] = None
+    has_driver_license: bool = Field(default=False, nullable=False)
+    status: EmployeeStatus = Field(default=EmployeeStatus.active, index=True)
+    employee_role: EmployeeRole = Field(default=EmployeeRole.employee, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class TeszorVatExpenseMap(SQLModel, table=True):
-
-    id: int = Field(default=None, primary_key=True)
-    teszor_code_id: int = Field(foreign_key="teszorcode.id")
-    vat_code_id: int = Field(foreign_key="vatcode.id")
-    expense_type_id: int = Field(foreign_key="expensetype.id")
-
-    teszor_code: Optional["TeszorCode"] = Relationship(back_populates="mappings")
-    vat_code: Optional["VatCode"] = Relationship(back_populates="mappings")
-    expense_type: Optional["ExpenseType"] = Relationship(back_populates="mappings")
+# class EmailType(str, Enum):
+#     to = "to"
+#     cc = "cc"
+#     bcc = "bcc"
 
 
-class EmployeeRead(SQLModel):
-    # id: int
-    name: str
-    axapta_name: Optional[str]
-    monogram: Optional[str]
-    cost_center: Optional[str]
+# class Status(str, Enum):
+#     pending = "pending"
+#     ready = "ready"
 
 
-class PhoneBookRead(SQLModel):
-    id: int
-    phone_number: str
-    # employee_id: int
-    employee: Optional[EmployeeRead]
+# class Role(str, Enum):
+#     admin = "admin"
+#     member = "member"
 
 
-class TeszorVatLedgerMapRead(SQLModel):
-    # id: int
-    # teszor_code_id: int
-    # vat_code_id: int
-    # expense_type_id: int
-    teszor_code: Optional[str]
-    vat_code: Optional[str]
-    vat_rate: Optional[str]
-    expense_title: Optional[str]
-    expense_account_number: Optional[str]
+# class Player(SQLModel, table=True):
+#     __tablename__ = "players"
+
+#     id: int = Field(default=None, primary_key=True)
+#     username: str = Field(unique=True, min_length=6, max_length=25)
+#     email: EmailStr = Field(default=None, max_length=100, nullable=True)
+#     role: Role = Field(default=Role.member)
+#     hashed_password: str = Field(max_length=255)
+#     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class MonthlySummary(SQLModel, table=True):
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    year: int
-    month: int
-    income: int
-    expense: int
-    income_invoice_count: Optional[int] = 0
-    expense_invoice_count: Optional[int] = 0
-    max_income_invoice: Optional[int] = 0
-    max_expense_invoice: Optional[int] = 0
-    income_vat_total: Optional[int] = 0
-    expense_vat_total: Optional[int] = 0
-    notes: Optional[str] = None
+# class PlayerCreate(SQLModel):
+#     username: str
+#     password: str
 
 
-class InvoiceStatusEnum(str, Enum):
-    paid = "paid"
-    overdue = "overdue"
-    in_progress = "in_progress"
+# class PlayerRead(SQLModel):
+#     id: int
+#     username: str
+#     email: Optional[EmailStr] = None
+#     role: Role
+#     created_at: datetime
+
+#     class Config:
+#         from_attributes = True
 
 
-class CurrencyEnum(str, Enum):
-    HUF = "HUF"
-    EUR = "EUR"
+# class Token(SQLModel):
+#     access_token: str
+#     token_type: str
 
 
-class InvoiceStatusSummary(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    partner_name: str
-    status: InvoiceStatusEnum = Field(index=True)
-    total_amount: int
-    period_year: int
-    period_month: Optional[int] = None
-    currency: CurrencyEnum = Field(default=CurrencyEnum.HUF, index=True)
+# class TokenData(SQLModel):
+#     username: str | None = None
 
 
-class StatusPieChartRow(SQLModel):
-    status: InvoiceStatusEnum
-    total_amount: int
+# class TokenWithUser(Token):
+#     user: PlayerRead
+
+
+# class PartnerEmailLink(SQLModel, table=True):
+#     __tablename__ = "partner_email_link"
+
+#     partner_id: Optional[int] = Field(
+#         default=None, foreign_key="partners.id", primary_key=True
+#     )
+#     email_id: Optional[int] = Field(
+#         default=None, foreign_key="partner_emails.id", primary_key=True
+#     )
+
+#     partner: Optional["Partner"] = Relationship(back_populates="partner_links")
+#     email: Optional["PartnerEmail"] = Relationship(back_populates="email_links")
+
+
+# class Partner(SQLModel, table=True):
+#     __tablename__ = "partners"
+
+#     id: int | None = Field(default=None, primary_key=True)
+#     name: str = Field(max_length=255, nullable=False)
+#     tax_number: str = Field(max_length=32, nullable=False)
+#     contact: Optional[str] = Field(default=None, max_length=255, nullable=True)
+
+#     emails: List["PartnerEmail"] = Relationship(
+#         back_populates="partners", link_model=PartnerEmailLink
+#     )
+#     partner_links: List["PartnerEmailLink"] = Relationship(back_populates="partner")
+#     invoices: List["UploadedInvoice"] = Relationship(back_populates="partner")
+
+
+# class PartnerCreate(SQLModel):
+#     name: str
+#     tax_number: str
+#     contact: Optional[str] = None
+
+
+# class PartnerEmail(SQLModel, table=True):
+#     __tablename__ = "partner_emails"
+
+#     id: int | None = Field(default=None, primary_key=True)
+#     email: str = Field(max_length=255, nullable=False)
+#     type: EmailType = Field(nullable=False)
+
+#     partners: List[Partner] = Relationship(
+#         back_populates="emails", link_model=PartnerEmailLink
+#     )
+#     email_links: List["PartnerEmailLink"] = Relationship(back_populates="email")
+
+
+# class UploadedInvoice(SQLModel, table=True):
+#     __tablename__ = "uploaded_invoices"
+
+#     id: int | None = Field(default=None, primary_key=True)
+#     filename: str = Field(nullable=False)
+#     own_tax_id: str | None = Field(default=None)
+#     partner_tax_id: str | None = Field(default=None)
+#     partner_id: int | None = Field(default=None, foreign_key="partners.id")
+#     blob_url: str | None = Field(default=None)
+#     status: Status = Field(default=Status.pending, nullable=False)
+#     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+
+#     partner: Optional["Partner"] = Relationship(back_populates="invoices")
+
+
+# class PartnerEmailResponse(SQLModel):
+#     id: int
+#     email: str
+#     type: EmailType
+
+
+# class PartnerEmailCreate(SQLModel):
+#     email: str
+#     type: EmailType
+#     # partner_ids: Optional[List[int]] = None
+
+
+# class PartnerEmailUpdate(SQLModel):
+#     email: Optional[str] = None
+#     type: Optional[EmailType] = None
+
+
+# class PartnerRead(SQLModel):
+#     id: int
+#     name: str
+#     tax_number: str
+#     contact: Optional[str] = None
+#     emails: List[PartnerEmailResponse] = []
+
+
+# class PartnerUpdate(SQLModel):
+#     name: Optional[str] = None
+#     tax_number: Optional[str] = None
+#     contact: Optional[str] = None
+
+
+# class Employee(SQLModel, table=True):
+
+#     id: int = Field(default=None, primary_key=True)
+#     name: str = Field(unique=True, max_length=50)
+#     axapta_name: Optional[str] = Field(default=None)
+#     monogram: str = Field(default=None)
+#     cost_center: str = Field(default=None)
+
+#     phone_numbers: List["PhoneBook"] = Relationship(back_populates="employee")
+
+
+# class PhoneBook(SQLModel, table=True):
+
+#     id: int = Field(default=None, primary_key=True)
+#     phone_number: str = Field(unique=True, max_length=12)
+
+#     employee_id: int = Field(foreign_key="employee.id")
+#     employee: Optional[Employee] = Relationship(back_populates="phone_numbers")
+
+
+# class VatCode(SQLModel, table=True):
+
+#     id: int = Field(default=None, primary_key=True)
+#     code: str = Field(unique=True, max_length=12)
+#     rate: Optional[str] = Field(default=None, max_length=4)
+
+#     mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="vat_code")
+
+
+# class TeszorCode(SQLModel, table=True):
+
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     teszor_code: str = Field(unique=True, max_length=20)
+
+#     mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="teszor_code")
+
+
+# class ExpenseType(SQLModel, table=True):
+
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     title: str = Field(unique=True, max_length=25)
+#     account_number: str = Field(max_length=10)
+
+#     mappings: List["TeszorVatExpenseMap"] = Relationship(back_populates="expense_type")
+
+
+# class TeszorVatExpenseMap(SQLModel, table=True):
+
+#     id: int = Field(default=None, primary_key=True)
+#     teszor_code_id: int = Field(foreign_key="teszorcode.id")
+#     vat_code_id: int = Field(foreign_key="vatcode.id")
+#     expense_type_id: int = Field(foreign_key="expensetype.id")
+
+#     teszor_code: Optional["TeszorCode"] = Relationship(back_populates="mappings")
+#     vat_code: Optional["VatCode"] = Relationship(back_populates="mappings")
+#     expense_type: Optional["ExpenseType"] = Relationship(back_populates="mappings")
+
+
+# class EmployeeRead(SQLModel):
+#     # id: int
+#     name: str
+#     axapta_name: Optional[str]
+#     monogram: Optional[str]
+#     cost_center: Optional[str]
+
+
+# class PhoneBookRead(SQLModel):
+#     id: int
+#     phone_number: str
+#     # employee_id: int
+#     employee: Optional[EmployeeRead]
+
+
+# class TeszorVatLedgerMapRead(SQLModel):
+#     # id: int
+#     # teszor_code_id: int
+#     # vat_code_id: int
+#     # expense_type_id: int
+#     teszor_code: Optional[str]
+#     vat_code: Optional[str]
+#     vat_rate: Optional[str]
+#     expense_title: Optional[str]
+#     expense_account_number: Optional[str]
+
+
+# class MonthlySummary(SQLModel, table=True):
+
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     year: int
+#     month: int
+#     income: int
+#     expense: int
+#     income_invoice_count: Optional[int] = 0
+#     expense_invoice_count: Optional[int] = 0
+#     max_income_invoice: Optional[int] = 0
+#     max_expense_invoice: Optional[int] = 0
+#     income_vat_total: Optional[int] = 0
+#     expense_vat_total: Optional[int] = 0
+#     notes: Optional[str] = None
+
+
+# class InvoiceStatusEnum(str, Enum):
+#     paid = "paid"
+#     overdue = "overdue"
+#     in_progress = "in_progress"
+
+
+# class CurrencyEnum(str, Enum):
+#     HUF = "HUF"
+#     EUR = "EUR"
+
+
+# class InvoiceStatusSummary(SQLModel, table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     partner_name: str
+#     status: InvoiceStatusEnum = Field(index=True)
+#     total_amount: int
+#     period_year: int
+#     period_month: Optional[int] = None
+#     currency: CurrencyEnum = Field(default=CurrencyEnum.HUF, index=True)
+
+
+# class StatusPieChartRow(SQLModel):
+#     status: InvoiceStatusEnum
+#     total_amount: int
